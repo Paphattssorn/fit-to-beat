@@ -234,25 +234,54 @@ class RhythmGameController extends ChangeNotifier {
     }
   }
 
-  /// Generate rhythmic beat sequence for demonstration & workout flow
+  /// Direct manual tracking update (for touch / mouse / screen reaches)
+  void updateWristDirectly(Offset normalizedPos, bool isRightHand) {
+    if (isRightHand) {
+      _latestWristData = _latestWristData.copyWith(
+        rightWrist: normalizedPos,
+        rightConfidence: 0.99,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      );
+    } else {
+      _latestWristData = _latestWristData.copyWith(
+        leftWrist: normalizedPos,
+        leftConfidence: 0.99,
+        timestampMs: DateTime.now().millisecondsSinceEpoch,
+      );
+    }
+    notifyListeners();
+  }
+
+  /// Generate rhythmic beat sequence with dynamic workout zones across the screen
   void _generateMockSongChart() {
     _activeNotes.clear();
-    // Generates alternating Left and Right notes matching mock punch cadence
     int startMs = 1200;
-    const intervalMs = 1800;
+    const intervalMs = 1600;
 
-    for (int i = 0; i < 30; i++) {
-      final isLeft = i % 2 == 0;
+    // Varied workout pattern across High, Mid, and Low targets
+    final List<Map<String, dynamic>> pattern = [
+      {'lane': NoteLane.left, 'target': GameConstants.midLeft},
+      {'lane': NoteLane.right, 'target': GameConstants.midRight},
+      {'lane': NoteLane.left, 'target': GameConstants.highLeft},
+      {'lane': NoteLane.right, 'target': GameConstants.highRight},
+      {'lane': NoteLane.left, 'target': GameConstants.lowLeft},
+      {'lane': NoteLane.right, 'target': GameConstants.lowRight},
+      {'lane': NoteLane.right, 'target': GameConstants.highRight},
+      {'lane': NoteLane.left, 'target': GameConstants.midLeft},
+      {'lane': NoteLane.right, 'target': GameConstants.midRight},
+      {'lane': NoteLane.left, 'target': GameConstants.lowLeft},
+    ];
+
+    for (int i = 0; i < 40; i++) {
+      final step = pattern[i % pattern.length];
       final targetTime = startMs + (i * intervalMs);
 
       _activeNotes.add(
         BeatNote(
           id: 'note_$i',
-          lane: isLeft ? NoteLane.left : NoteLane.right,
+          lane: step['lane'] as NoteLane,
           targetTimestampMs: targetTime,
-          normalizedTarget: isLeft
-              ? GameConstants.leftTargetNormalized
-              : GameConstants.rightTargetNormalized,
+          normalizedTarget: step['target'] as Offset,
         ),
       );
     }

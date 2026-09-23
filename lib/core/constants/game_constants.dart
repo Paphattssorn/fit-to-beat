@@ -5,21 +5,32 @@ class GameConstants {
   const GameConstants._();
 
   // Timing Windows (millisecond differences between note target time and hit time)
-  static const int perfectWindowMs = 140; // Timing threshold for PERFECT rating
-  static const int goodWindowMs = 280;    // Timing threshold for GOOD rating
-  static const int missThresholdMs = 320; // Passed note considered MISS
+  static const int perfectWindowMs = 180; // Generous for workout motions
+  static const int goodWindowMs = 320;    // Generous for workout motions
+  static const int missThresholdMs = 380; // Passed note considered MISS
 
   // Spatial Dimensions (in logical pixels)
-  static const double hitZoneRadius = 50.0;
-  static const double wristHitTolerance = 30.0; // Extra tolerance around wrist point
+  static const double hitZoneRadius = 55.0;
+  static const double wristHitTolerance = 45.0; // Responsive reach tolerance
   static const double noteApproachScale = 2.4;  // Initial scale when note spawns
-  static const int noteApproachDurationMs = 1000; // How long note takes to reach target
+  static const int noteApproachDurationMs = 1200; // How long note takes to reach target
 
-  // Normalized hit zone screen positions (X: 0.0 - 1.0, Y: 0.0 - 1.0)
-  // Left zone is typically around upper-left shoulder/chest height for punch/reach
-  static const Offset leftTargetNormalized = Offset(0.22, 0.38);
-  // Right zone is upper-right
-  static const Offset rightTargetNormalized = Offset(0.78, 0.38);
+  // Dynamic Workout Hit Zone Screen Positions (Normalized 0.0 - 1.0)
+  // 1. High Zones (Upper jabs, head height reaches)
+  static const Offset highLeft = Offset(0.24, 0.28);
+  static const Offset highRight = Offset(0.76, 0.28);
+
+  // 2. Mid Zones (Chest height crosses, straight punches)
+  static const Offset midLeft = Offset(0.20, 0.44);
+  static const Offset midRight = Offset(0.80, 0.44);
+
+  // 3. Low Zones (Body hooks, abdominal height)
+  static const Offset lowLeft = Offset(0.26, 0.60);
+  static const Offset lowRight = Offset(0.74, 0.60);
+
+  // Default left and right anchors
+  static const Offset leftTargetNormalized = midLeft;
+  static const Offset rightTargetNormalized = midRight;
 
   // Scoring
   static const int scorePerfect = 300;

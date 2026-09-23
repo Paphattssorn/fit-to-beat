@@ -25,8 +25,8 @@ class MockPoseDetectorService implements PoseDetectorService {
   bool _leftPunching = false;
   bool _rightPunching = false;
 
-  // Auto workout simulation mode (automatically punches in rhythm)
-  bool autoSimulateWorkout = true;
+  // Auto workout simulation mode (default false so user plays with real movement)
+  bool autoSimulateWorkout = false;
 
   PoseWristData _latestData = const PoseWristData(
     leftWrist: defaultLeftGuard,

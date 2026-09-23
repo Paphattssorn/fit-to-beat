@@ -6,12 +6,12 @@ import '../models/hit_result.dart';
 import '../models/pose_wrist_data.dart';
 
 /// Pure logic evaluator for Hit Collision and Timing Windows.
-/// Separated from UI and state to ensure high performance and 100% unit-testability.
+/// Evaluates both left and right wrists (allowing cross punches, jabs, and touches).
 class GameHitEvaluator {
   const GameHitEvaluator._();
 
   /// Evaluates whether a [note] is struck by either wrist given current [songTimeMs] and [screenSize].
-  /// Returns [HitFeedback] if collision occurred within valid timing window, or null otherwise.
+  /// Checks whichever wrist (or touch point) is closest to the target circle.
   static HitFeedback? evaluateHit({
     required BeatNote note,
     required PoseWristData wristData,
@@ -26,24 +26,36 @@ class GameHitEvaluator {
       note.normalizedTarget.dy * screenSize.height,
     );
 
-    // Get the appropriate wrist based on note lane (Left hand for Left lane, Right hand for Right lane)
-    final wristPos = note.lane == NoteLane.left
-        ? wristData.getLeftScreenOffset(screenSize)
-        : wristData.getRightScreenOffset(screenSize);
+    final leftPos = wristData.getLeftScreenOffset(screenSize);
+    final rightPos = wristData.getRightScreenOffset(screenSize);
 
-    if (wristPos == null) return null;
+    // Evaluate whichever hand/touch is closest to the target circle
+    double minDistance = double.infinity;
+    Offset? hittingHand;
 
-    // Check confidence if available
-    final isConfident = note.lane == NoteLane.left
-        ? wristData.isLeftConfident
-        : wristData.isRightConfident;
-    if (!isConfident) return null;
+    if (leftPos != null && wristData.isLeftConfident) {
+      final d = (leftPos - targetScreenPos).distance;
+      if (d < minDistance) {
+        minDistance = d;
+        hittingHand = leftPos;
+      }
+    }
+
+    if (rightPos != null && wristData.isRightConfident) {
+      final d = (rightPos - targetScreenPos).distance;
+      if (d < minDistance) {
+        minDistance = d;
+        hittingHand = rightPos;
+      }
+    }
+
+    if (hittingHand == null) return null;
 
     // 1. Spatial Collision Check (Euclidean Distance)
-    final distance = (wristPos - targetScreenPos).distance;
+    // Generous hit tolerance so reaching out feels natural and responsive
     final maxAllowedDistance = GameConstants.hitZoneRadius + GameConstants.wristHitTolerance;
 
-    if (distance > maxAllowedDistance) {
+    if (minDistance > maxAllowedDistance) {
       return null; // Wrist is outside the hit radius
     }
 
@@ -70,7 +82,6 @@ class GameHitEvaluator {
       );
     }
 
-    // Too early or too late to qualify as hit
     return null;
   }
 

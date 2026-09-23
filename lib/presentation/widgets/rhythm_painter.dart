@@ -37,57 +37,64 @@ class RhythmPainter extends CustomPainter {
     _drawHitParticles(canvas);
   }
 
-  /// Draws the left and right target zones (with pixel art support)
+  /// Draws dynamic workout hit zones across the playfield (High, Mid, Low)
   void _drawHitZones(Canvas canvas, Size size, int currentSongTime) {
-    final leftCenter = Offset(
-      GameConstants.leftTargetNormalized.dx * size.width,
-      GameConstants.leftTargetNormalized.dy * size.height,
-    );
-
-    final rightCenter = Offset(
-      GameConstants.rightTargetNormalized.dx * size.width,
-      GameConstants.rightTargetNormalized.dy * size.height,
-    );
-
     const radius = GameConstants.hitZoneRadius;
-
-    // Subtle rhythmic pulse on target zone (sine wave on beat)
-    final pulseScale = 1.0 + 0.05 * math.sin(currentSongTime / 150.0);
+    final pulseScale = 1.0 + 0.06 * math.sin(currentSongTime / 150.0);
     final pulsedRadius = radius * pulseScale;
 
-    // Draw Left Hit Zone (Sprite or Vector Fallback)
-    PixelArtHelper.drawSpriteOrFallback(
-      canvas: canvas,
-      center: leftCenter,
-      width: pulsedRadius * 2,
-      height: pulsedRadius * 2,
-      spriteImage: controller.leftZoneSprite,
-      fallbackDraw: () {
-        PixelArtHelper.drawRetroVectorHitZone(
-          canvas: canvas,
-          center: leftCenter,
-          radius: pulsedRadius,
-          color: GameConstants.colorLeftLane,
-        );
-      },
-    );
+    // 1. Draw subtle ambient workout target guides (shows the 6 workout positions)
+    const workoutAnchors = [
+      GameConstants.highLeft, GameConstants.highRight,
+      GameConstants.midLeft, GameConstants.midRight,
+      GameConstants.lowLeft, GameConstants.lowRight,
+    ];
 
-    // Draw Right Hit Zone (Sprite or Vector Fallback)
-    PixelArtHelper.drawSpriteOrFallback(
-      canvas: canvas,
-      center: rightCenter,
-      width: pulsedRadius * 2,
-      height: pulsedRadius * 2,
-      spriteImage: controller.rightZoneSprite,
-      fallbackDraw: () {
-        PixelArtHelper.drawRetroVectorHitZone(
-          canvas: canvas,
-          center: rightCenter,
-          radius: pulsedRadius,
-          color: GameConstants.colorRightLane,
-        );
-      },
-    );
+    for (final anchor in workoutAnchors) {
+      final center = Offset(anchor.dx * size.width, anchor.dy * size.height);
+      final isLeft = anchor.dx < 0.5;
+      final guidePaint = Paint()
+        ..color = (isLeft ? GameConstants.colorLeftLane : GameConstants.colorRightLane)
+            .withValues(alpha: 0.18)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+      canvas.drawCircle(center, radius * 0.75, guidePaint);
+    }
+
+    // 2. Highlight active approaching target zones prominently
+    final activeNotes = controller.activeNotes.where((n) => n.isActive(currentSongTime)).toList();
+    final Set<Offset> activeTargets = {};
+
+    if (activeNotes.isEmpty) {
+      activeTargets.add(GameConstants.midLeft);
+      activeTargets.add(GameConstants.midRight);
+    } else {
+      for (final note in activeNotes) {
+        activeTargets.add(note.normalizedTarget);
+      }
+    }
+
+    for (final target in activeTargets) {
+      final center = Offset(target.dx * size.width, target.dy * size.height);
+      final isLeft = target.dx < 0.5;
+      final laneColor = isLeft ? GameConstants.colorLeftLane : GameConstants.colorRightLane;
+
+      PixelArtHelper.drawSpriteOrFallback(
+        canvas: canvas,
+        center: center,
+        width: pulsedRadius * 2,
+        height: pulsedRadius * 2,
+        spriteImage: isLeft ? controller.leftZoneSprite : controller.rightZoneSprite,
+        fallbackDraw: () {
+          PixelArtHelper.drawRetroVectorHitZone(
+            canvas: canvas,
+            center: center,
+            radius: pulsedRadius,
+            color: laneColor,
+          );
+        },
+      );
+    }
   }
 
   /// Draws notes approaching the target hit zones
