@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/constants/game_constants.dart';
 import '../../game_engine/rhythm_game_controller.dart';
 import '../../models/hit_result.dart';
@@ -61,6 +62,13 @@ class _HudScoreOverlayState extends State<HudScoreOverlay>
 
     // Listen to discrete hit events
     widget.controller.hitFeedbackNotifier.addListener(_onHitEvent);
+    widget.controller.addListener(_onControllerStateChange);
+  }
+
+  void _onControllerStateChange() {
+    if (mounted && !widget.controller.isPlaying) {
+      setState(() {});
+    }
   }
 
   void _onHitEvent() {
@@ -77,26 +85,57 @@ class _HudScoreOverlayState extends State<HudScoreOverlay>
   @override
   void dispose() {
     widget.controller.hitFeedbackNotifier.removeListener(_onHitEvent);
+    widget.controller.removeListener(_onControllerStateChange);
     _popupAnimController.dispose();
     super.dispose();
   }
 
+  void _toggleOrientation(BuildContext context) {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    if (isLandscape) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+      ]);
+    } else {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    final isPlaying = widget.controller.isPlaying;
+    final score = widget.controller.score;
+
     return RepaintBoundary(
       child: SafeArea(
         child: Stack(
           children: [
             // Top HUD Status Bar
             Positioned(
-              top: 16,
-              left: 20,
-              right: 20,
-              child: _buildTopBar(),
+              top: isLandscape ? 10 : 16,
+              left: isLandscape ? 16 : 20,
+              right: isLandscape ? 16 : 20,
+              child: _buildTopBar(isLandscape),
             ),
 
+            // Start Screen Overlay (when game has not started yet)
+            if (!isPlaying && score == 0)
+              Positioned.fill(
+                child: _buildStartScreen(context, isLandscape),
+              ),
+
+            // Pause Screen Overlay (when paused mid-game)
+            if (!isPlaying && score > 0)
+              Positioned.fill(
+                child: _buildPauseScreen(context, isLandscape),
+              ),
+
             // Center Dynamic Rating Popup ("PERFECT", "GOOD", "MISS")
-            if (_currentFeedback != null)
+            if (isPlaying && _currentFeedback != null)
               Positioned.fill(
                 child: Center(
                   child: AnimatedBuilder(
@@ -114,27 +153,31 @@ class _HudScoreOverlayState extends State<HudScoreOverlay>
                 ),
               ),
 
-            // Bottom Quick Controls & Mock Punch Tester (For Dev & Simulator)
-            Positioned(
-              bottom: 20,
-              left: 20,
-              right: 20,
-              child: _buildBottomControls(),
-            ),
+            // Bottom Controls (Visible when active workout is in progress)
+            if (isPlaying)
+              Positioned(
+                bottom: isLandscape ? 12 : 20,
+                left: 20,
+                right: 20,
+                child: _buildBottomControls(isLandscape),
+              ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar(bool isLandscape) {
     final score = widget.controller.score;
     final combo = widget.controller.combo;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: isLandscape ? 16 : 20,
+        vertical: isLandscape ? 8 : 12,
+      ),
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.5),
+        color: Colors.black.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white24, width: 1.5),
         boxShadow: [
@@ -148,7 +191,7 @@ class _HudScoreOverlayState extends State<HudScoreOverlay>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Score Display
+          // 1. Score Display
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -157,16 +200,16 @@ class _HudScoreOverlayState extends State<HudScoreOverlay>
                 'FIT SCORE',
                 style: TextStyle(
                   color: Colors.white54,
-                  fontSize: 11,
+                  fontSize: 10,
                   letterSpacing: 2,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               Text(
                 score.toString().padLeft(6, '0'),
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
-                  fontSize: 26,
+                  fontSize: isLandscape ? 22 : 26,
                   fontWeight: FontWeight.w900,
                   fontFamily: 'monospace',
                   letterSpacing: 2,
@@ -175,54 +218,98 @@ class _HudScoreOverlayState extends State<HudScoreOverlay>
             ],
           ),
 
-          // Middle: AI Mode Toggle Badge
-          InkWell(
-            onTap: widget.onToggleMode,
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: widget.isRealAiActive
-                    ? Colors.green.withValues(alpha: 0.25)
-                    : Colors.orange.withValues(alpha: 0.25),
+          // 2. Middle Controls: AI Mode Toggle + Orientation Toggle
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // AI Mode Badge
+              InkWell(
+                onTap: widget.onToggleMode,
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: widget.isRealAiActive
-                      ? Colors.greenAccent
-                      : Colors.orangeAccent,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    widget.isRealAiActive ? Icons.videocam : Icons.smart_toy,
-                    size: 14,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
                     color: widget.isRealAiActive
-                        ? Colors.greenAccent
-                        : Colors.orangeAccent,
-                  ),
-                  const SizedBox(width: 5),
-                  Text(
-                    widget.isRealAiActive ? 'REAL AI' : 'MOCK BOT',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
+                        ? Colors.green.withValues(alpha: 0.25)
+                        : Colors.orange.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
                       color: widget.isRealAiActive
                           ? Colors.greenAccent
                           : Colors.orangeAccent,
-                      letterSpacing: 1.0,
                     ),
                   ),
-                ],
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        widget.isRealAiActive ? Icons.videocam : Icons.smart_toy,
+                        size: 14,
+                        color: widget.isRealAiActive
+                            ? Colors.greenAccent
+                            : Colors.orangeAccent,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        widget.isRealAiActive ? 'REAL AI' : 'MOCK BOT',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: widget.isRealAiActive
+                              ? Colors.greenAccent
+                              : Colors.orangeAccent,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
+
+              const SizedBox(width: 8),
+
+              // Orientation Switch Badge (1-Tap Toggle)
+              InkWell(
+                onTap: () => _toggleOrientation(context),
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.cyanAccent.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.cyanAccent.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.screen_rotation,
+                        size: 14,
+                        color: Colors.cyanAccent,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        isLandscape ? 'LANDSCAPE' : 'PORTRAIT',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.cyanAccent,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
 
-          // Combo Streak Counter
+          // 3. Combo Streak Counter
           if (combo > 1)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [GameConstants.colorLeftLane, GameConstants.colorRightLane],
@@ -233,14 +320,218 @@ class _HudScoreOverlayState extends State<HudScoreOverlay>
                 '$combo COMBO!',
                 style: const TextStyle(
                   color: Colors.black,
-                  fontSize: 16,
+                  fontSize: 14,
                   fontWeight: FontWeight.w900,
                   fontStyle: FontStyle.italic,
-                  letterSpacing: 1.5,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            )
+          else
+            const SizedBox(width: 40),
+        ],
+      ),
+    );
+  }
+
+  /// Start Screen Card shown before workout begins
+  Widget _buildStartScreen(BuildContext context, bool isLandscape) {
+    final hasPose = widget.controller.latestWristData.hasAnyPose;
+
+    return Center(
+      child: Container(
+        width: isLandscape ? 480 : 330,
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: EdgeInsets.all(isLandscape ? 18 : 24),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.88),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.cyanAccent, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.cyanAccent.withValues(alpha: 0.35),
+              blurRadius: 24,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '🥊 FIT TO BEAT',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: isLandscape ? 24 : 28,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 3,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'ยืนห่างจากกล้อง 1.5 - 2 เมตร ให้เห็นท่อนบนและแขน\nต่อยหรือเอื้อมมือเข้าหาเป้าหมายตามจังหวะ',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: isLandscape ? 12 : 13,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 14),
+
+            // Pose detection status indicator
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: (hasPose ? Colors.green : Colors.amber).withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: hasPose ? Colors.greenAccent : Colors.amberAccent,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    hasPose ? Icons.check_circle : Icons.accessibility_new,
+                    size: 16,
+                    color: hasPose ? Colors.greenAccent : Colors.amberAccent,
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      hasPose
+                          ? 'ตรวจพบตำแหน่งร่างกายแล้ว พร้อมเล่น!'
+                          : 'ยกแขนหน้ากล้องเพื่อเช็กตำแหน่ง...',
+                      style: TextStyle(
+                        color: hasPose ? Colors.greenAccent : Colors.amberAccent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            SizedBox(height: isLandscape ? 14 : 20),
+
+            // Big Start Button
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.cyanAccent,
+                foregroundColor: Colors.black,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isLandscape ? 32 : 38,
+                  vertical: isLandscape ? 12 : 16,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                elevation: 8,
+              ),
+              onPressed: () {
+                widget.controller.start();
+                setState(() {});
+              },
+              icon: const Icon(Icons.play_arrow, size: 26),
+              label: Text(
+                'START WORKOUT (เริ่มเล่น)',
+                style: TextStyle(
+                  fontSize: isLandscape ? 15 : 17,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.2,
                 ),
               ),
             ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Pause Screen Modal
+  Widget _buildPauseScreen(BuildContext context, bool isLandscape) {
+    final score = widget.controller.score;
+
+    return Center(
+      child: Container(
+        width: isLandscape ? 400 : 310,
+        padding: EdgeInsets.all(isLandscape ? 18 : 24),
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.9),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.amberAccent, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.amberAccent.withValues(alpha: 0.3),
+              blurRadius: 20,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              '⏸️ WORKOUT PAUSED',
+              style: TextStyle(
+                color: Colors.amberAccent,
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 2,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'SCORE: ${score.toString().padLeft(6, '0')}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontFamily: 'monospace',
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white70,
+                    side: const BorderSide(color: Colors.white30),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  onPressed: () {
+                    widget.controller.restart();
+                    widget.controller.pause();
+                    setState(() {});
+                  },
+                  icon: const Icon(Icons.refresh, size: 18),
+                  label: const Text('RESTART'),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.cyanAccent,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
+                  onPressed: () {
+                    widget.controller.start();
+                    setState(() {});
+                  },
+                  icon: const Icon(Icons.play_arrow, size: 20),
+                  label: const Text(
+                    'RESUME',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -273,8 +564,7 @@ class _HudScoreOverlayState extends State<HudScoreOverlay>
     );
   }
 
-  Widget _buildBottomControls() {
-    final isPlaying = widget.controller.isPlaying;
+  Widget _buildBottomControls(bool isLandscape) {
     final poseService = widget.controller.poseService;
 
     return Row(
@@ -293,28 +583,24 @@ class _HudScoreOverlayState extends State<HudScoreOverlay>
             label: const Text('PUNCH L'),
           ),
 
-        const SizedBox(width: 12),
+        if (poseService is MockPoseDetectorService) const SizedBox(width: 12),
 
-        // Play / Pause Toggle
+        // Pause Button
         FloatingActionButton.extended(
-          backgroundColor: isPlaying ? Colors.amberAccent : Colors.cyanAccent,
+          backgroundColor: Colors.amberAccent,
           foregroundColor: Colors.black,
           onPressed: () {
-            if (isPlaying) {
-              widget.controller.pause();
-            } else {
-              widget.controller.start();
-            }
+            widget.controller.pause();
             setState(() {});
           },
-          icon: Icon(isPlaying ? Icons.pause : Icons.play_arrow),
-          label: Text(
-            isPlaying ? 'PAUSE' : 'START WORKOUT',
-            style: const TextStyle(fontWeight: FontWeight.bold),
+          icon: const Icon(Icons.pause),
+          label: const Text(
+            'PAUSE',
+            style: TextStyle(fontWeight: FontWeight.bold),
           ),
         ),
 
-        const SizedBox(width: 12),
+        if (poseService is MockPoseDetectorService) const SizedBox(width: 12),
 
         // Right Manual Punch Button (Simulator Testing)
         if (poseService is MockPoseDetectorService)

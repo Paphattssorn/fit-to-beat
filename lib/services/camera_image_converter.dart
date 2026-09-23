@@ -1,6 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
 /// Robust helper to convert [CameraImage] from Flutter camera stream to [InputImage] for Google ML Kit.
@@ -9,11 +9,33 @@ class CameraImageConverter {
   const CameraImageConverter._();
 
   /// Converts a [CameraImage] into an [InputImage] compatible with ML Kit detectors.
+  /// Dynamically compensates for device orientation (portrait vs landscape).
   static InputImage? toInputImage({
     required CameraImage cameraImage,
     required CameraDescription camera,
+    DeviceOrientation deviceOrientation = DeviceOrientation.portraitUp,
   }) {
-    final rotation = InputImageRotationValue.fromRawValue(camera.sensorOrientation);
+    InputImageRotation? rotation;
+    final sensorOrientation = camera.sensorOrientation;
+
+    if (defaultTargetPlatform == TargetPlatform.iOS) {
+      rotation = InputImageRotationValue.fromRawValue(sensorOrientation);
+    } else {
+      const orientations = {
+        DeviceOrientation.portraitUp: 0,
+        DeviceOrientation.landscapeLeft: 90,
+        DeviceOrientation.portraitDown: 180,
+        DeviceOrientation.landscapeRight: 270,
+      };
+      var compensation = orientations[deviceOrientation] ?? 0;
+      if (camera.lensDirection == CameraLensDirection.front) {
+        compensation = (sensorOrientation + compensation) % 360;
+      } else {
+        compensation = (sensorOrientation - compensation + 360) % 360;
+      }
+      rotation = InputImageRotationValue.fromRawValue(compensation);
+    }
+
     if (rotation == null) return null;
 
     final Uint8List bytes;

@@ -64,9 +64,7 @@ class _RhythmGameScreenState extends State<RhythmGameScreen>
     setState(() {
       _isInitialized = true;
     });
-
-    // Auto-start workout
-    _gameController.start();
+    // Wait for user to be ready and press START WORKOUT
   }
 
   /// Hook called when front camera finishes hardware initialization

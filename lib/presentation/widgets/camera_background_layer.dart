@@ -114,23 +114,15 @@ class _CameraBackgroundLayerState extends State<CameraBackgroundLayer>
       return LayoutBuilder(
         builder: (context, constraints) {
           final camera = _cameraController!;
-          final previewSize = camera.value.previewSize ?? constraints.biggest;
+          if (!camera.value.isInitialized) return _buildSimulatorFallback();
 
-          // Scale preview to cover screen completely (aspect fill)
-          final scale = constraints.biggest.aspectRatio *
-              (previewSize.height / previewSize.width);
-
-          return ClipRect(
-            child: OverflowBox(
-              alignment: Alignment.center,
-              child: FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: constraints.maxWidth,
-                  height: constraints.maxWidth *
-                      (scale < 1.0 ? 1.0 / scale : scale),
-                  child: CameraPreview(camera),
-                ),
+          return SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              clipBehavior: Clip.hardEdge,
+              child: SizedBox(
+                width: 100,
+                child: CameraPreview(camera),
               ),
             ),
           );

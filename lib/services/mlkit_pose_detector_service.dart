@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 import '../models/pose_wrist_data.dart';
 import 'camera_image_converter.dart';
@@ -98,9 +98,11 @@ class MlKitPoseDetectorService implements PoseDetectorService {
     _lastInferenceTimeMs = now;
 
     try {
+      final deviceOrientation = _cameraController?.value.deviceOrientation ?? DeviceOrientation.portraitUp;
       final inputImage = CameraImageConverter.toInputImage(
         cameraImage: cameraImage,
         camera: description,
+        deviceOrientation: deviceOrientation,
       );
 
       if (inputImage == null) return;
@@ -114,9 +116,9 @@ class MlKitPoseDetectorService implements PoseDetectorService {
         final leftElbow = pose.landmarks[PoseLandmarkType.leftElbow];
         final rightElbow = pose.landmarks[PoseLandmarkType.rightElbow];
 
-        // Determine frame dimensions relative to orientation
-        final rotation = description.sensorOrientation;
-        final bool isRotated = rotation == 90 || rotation == 270;
+        // Determine frame dimensions relative to orientation after rotation compensation
+        final rotationDegrees = inputImage.metadata?.rotation.rawValue ?? description.sensorOrientation;
+        final bool isRotated = rotationDegrees == 90 || rotationDegrees == 270;
         final double frameWidth = isRotated
             ? cameraImage.height.toDouble()
             : cameraImage.width.toDouble();

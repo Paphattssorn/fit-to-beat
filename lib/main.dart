@@ -5,9 +5,11 @@ import 'presentation/screens/rhythm_game_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Lock orientation to portrait for standard fitness tracking setup
+  // Support both portrait and landscape for flexible fitness workout setup
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
   ]);
 
   runApp(const FitToBeatApp());
