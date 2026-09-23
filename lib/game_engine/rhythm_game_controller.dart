@@ -234,23 +234,7 @@ class RhythmGameController extends ChangeNotifier {
     }
   }
 
-  /// Direct manual tracking update (for touch / mouse / screen reaches)
-  void updateWristDirectly(Offset normalizedPos, bool isRightHand) {
-    if (isRightHand) {
-      _latestWristData = _latestWristData.copyWith(
-        rightWrist: normalizedPos,
-        rightConfidence: 0.99,
-        timestampMs: DateTime.now().millisecondsSinceEpoch,
-      );
-    } else {
-      _latestWristData = _latestWristData.copyWith(
-        leftWrist: normalizedPos,
-        leftConfidence: 0.99,
-        timestampMs: DateTime.now().millisecondsSinceEpoch,
-      );
-    }
-    notifyListeners();
-  }
+
 
   /// Generate rhythmic beat sequence with dynamic workout zones across the screen
   void _generateMockSongChart() {

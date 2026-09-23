@@ -111,6 +111,8 @@ class MlKitPoseDetectorService implements PoseDetectorService {
         final pose = poses.first;
         final leftWrist = pose.landmarks[PoseLandmarkType.leftWrist];
         final rightWrist = pose.landmarks[PoseLandmarkType.rightWrist];
+        final leftElbow = pose.landmarks[PoseLandmarkType.leftElbow];
+        final rightElbow = pose.landmarks[PoseLandmarkType.rightElbow];
 
         // Determine frame dimensions relative to orientation
         final rotation = description.sensorOrientation;
@@ -140,14 +142,38 @@ class MlKitPoseDetectorService implements PoseDetectorService {
           rightOffset = Offset(isFrontCamera ? (1.0 - normX) : normX, normY);
         }
 
+        Offset? leftElbowOffset;
+        if (leftElbow != null) {
+          final normX = (leftElbow.x / frameWidth).clamp(0.0, 1.0);
+          final normY = (leftElbow.y / frameHeight).clamp(0.0, 1.0);
+          leftElbowOffset = Offset(isFrontCamera ? (1.0 - normX) : normX, normY);
+        }
+
+        Offset? rightElbowOffset;
+        if (rightElbow != null) {
+          final normX = (rightElbow.x / frameWidth).clamp(0.0, 1.0);
+          final normY = (rightElbow.y / frameHeight).clamp(0.0, 1.0);
+          rightElbowOffset = Offset(isFrontCamera ? (1.0 - normX) : normX, normY);
+        }
+
         _latestWristData = PoseWristData(
           leftWrist: leftOffset,
           rightWrist: rightOffset,
+          leftElbow: leftElbowOffset,
+          rightElbow: rightElbowOffset,
           leftConfidence: leftWrist?.likelihood ?? 0.0,
           rightConfidence: rightWrist?.likelihood ?? 0.0,
           timestampMs: DateTime.now().millisecondsSinceEpoch,
         );
 
+        _streamController.add(_latestWristData);
+      } else {
+        // No body pose detected in this frame
+        _latestWristData = _latestWristData.copyWith(
+          leftConfidence: 0.0,
+          rightConfidence: 0.0,
+          timestampMs: DateTime.now().millisecondsSinceEpoch,
+        );
         _streamController.add(_latestWristData);
       }
     } catch (e) {
