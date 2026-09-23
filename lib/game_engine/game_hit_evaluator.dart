@@ -29,35 +29,37 @@ class GameHitEvaluator {
     final leftPos = wristData.getLeftScreenOffset(screenSize);
     final rightPos = wristData.getRightScreenOffset(screenSize);
 
-    // Evaluate whichever hand/touch is closest to the target circle
-    double minDistance = double.infinity;
+    // Evaluate hitting hand with lane preference for dual-hand chords
     Offset? hittingHand;
 
-    if (leftPos != null && wristData.isLeftConfident) {
-      final d = (leftPos - targetScreenPos).distance;
-      if (d < minDistance) {
-        minDistance = d;
-        hittingHand = leftPos;
+    final primaryPos = note.lane == NoteLane.left ? leftPos : rightPos;
+    final isPrimaryConfident = note.lane == NoteLane.left
+        ? wristData.isLeftConfident
+        : wristData.isRightConfident;
+
+    final secondaryPos = note.lane == NoteLane.left ? rightPos : leftPos;
+    final isSecondaryConfident = note.lane == NoteLane.left
+        ? wristData.isRightConfident
+        : wristData.isLeftConfident;
+
+    final maxAllowedDistance = GameConstants.hitZoneRadius + GameConstants.wristHitTolerance;
+
+    if (primaryPos != null && isPrimaryConfident) {
+      final d = (primaryPos - targetScreenPos).distance;
+      if (d <= maxAllowedDistance) {
+        hittingHand = primaryPos;
       }
     }
 
-    if (rightPos != null && wristData.isRightConfident) {
-      final d = (rightPos - targetScreenPos).distance;
-      if (d < minDistance) {
-        minDistance = d;
-        hittingHand = rightPos;
+    // If primary hand didn't hit, check secondary hand (allows single cross reaches)
+    if (hittingHand == null && secondaryPos != null && isSecondaryConfident) {
+      final d = (secondaryPos - targetScreenPos).distance;
+      if (d <= maxAllowedDistance) {
+        hittingHand = secondaryPos;
       }
     }
 
     if (hittingHand == null) return null;
-
-    // 1. Spatial Collision Check (Euclidean Distance)
-    // Generous hit tolerance so reaching out feels natural and responsive
-    final maxAllowedDistance = GameConstants.hitZoneRadius + GameConstants.wristHitTolerance;
-
-    if (minDistance > maxAllowedDistance) {
-      return null; // Wrist is outside the hit radius
-    }
 
     // 2. Timing Window Check
     final timingDiff = (songTimeMs - note.targetTimestampMs).abs();

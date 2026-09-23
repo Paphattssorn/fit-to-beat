@@ -303,6 +303,44 @@ class _HudScoreOverlayState extends State<HudScoreOverlay>
                   ),
                 ),
               ),
+
+              const SizedBox(width: 8),
+
+              // Camera Flip / Mirror Switch Badge
+              InkWell(
+                onTap: widget.controller.toggleCameraMirror,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.purpleAccent.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.purpleAccent.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.flip_camera_android,
+                        size: 14,
+                        color: Colors.purpleAccent,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        widget.controller.isCameraMirrored ? 'MIRROR' : 'NORMAL',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.purpleAccent,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
 
@@ -328,7 +366,7 @@ class _HudScoreOverlayState extends State<HudScoreOverlay>
               ),
             )
           else
-            const SizedBox(width: 40),
+            const SizedBox(width: 20),
         ],
       ),
     );
@@ -340,11 +378,11 @@ class _HudScoreOverlayState extends State<HudScoreOverlay>
 
     return Center(
       child: Container(
-        width: isLandscape ? 480 : 330,
-        margin: const EdgeInsets.symmetric(horizontal: 20),
-        padding: EdgeInsets.all(isLandscape ? 18 : 24),
+        width: isLandscape ? 380 : 320,
+        margin: const EdgeInsets.symmetric(horizontal: 16),
+        padding: EdgeInsets.all(isLandscape ? 16 : 22),
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.88),
+          color: Colors.black.withValues(alpha: 0.85),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: Colors.cyanAccent, width: 2),
           boxShadow: [
@@ -362,26 +400,28 @@ class _HudScoreOverlayState extends State<HudScoreOverlay>
               '🥊 FIT TO BEAT',
               style: TextStyle(
                 color: Colors.white,
-                fontSize: isLandscape ? 24 : 28,
+                fontSize: isLandscape ? 22 : 26,
                 fontWeight: FontWeight.w900,
                 letterSpacing: 3,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
-              'ยืนห่างจากกล้อง 1.5 - 2 เมตร ให้เห็นท่อนบนและแขน\nต่อยหรือเอื้อมมือเข้าหาเป้าหมายตามจังหวะ',
+              hasPose
+                  ? '🎯 วงกลมเป้าหมายล็อกที่มือแล้ว! ลองขยับหมัดดู'
+                  : 'ยืนห่างจากกล้อง 1.5 - 2 เมตร แล้วชูมือตั้งการ์ด\nวงกลมจะวิ่งไปล็อกที่มือของคุณทันที',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.white70,
-                fontSize: isLandscape ? 12 : 13,
-                height: 1.4,
+                fontSize: isLandscape ? 11 : 12,
+                height: 1.35,
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
 
             // Pose detection status indicator
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               decoration: BoxDecoration(
                 color: (hasPose ? Colors.green : Colors.amber).withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(16),
@@ -401,11 +441,11 @@ class _HudScoreOverlayState extends State<HudScoreOverlay>
                   Flexible(
                     child: Text(
                       hasPose
-                          ? 'ตรวจพบตำแหน่งร่างกายแล้ว พร้อมเล่น!'
-                          : 'ยกแขนหน้ากล้องเพื่อเช็กตำแหน่ง...',
+                          ? 'ตรวจพบตำแหน่งมือแล้ว พร้อมต่อย!'
+                          : 'ชูมือขึ้นเพื่อเช็กวงกลมเป้าหมาย...',
                       style: TextStyle(
                         color: hasPose ? Colors.greenAccent : Colors.amberAccent,
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.bold,
                       ),
                       overflow: TextOverflow.ellipsis,

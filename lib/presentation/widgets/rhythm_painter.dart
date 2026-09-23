@@ -23,15 +23,18 @@ class RhythmPainter extends CustomPainter {
     controller.updateScreenSize(size);
 
     final currentSongTime = controller.currentSongTimeMs;
+    final animTime = controller.isPlaying
+        ? currentSongTime
+        : DateTime.now().millisecondsSinceEpoch;
 
     // 1. Draw Static / Pulsing Hit Zones (Left & Right)
-    _drawHitZones(canvas, size, currentSongTime);
+    _drawHitZones(canvas, size, animTime);
 
     // 2. Draw Approaching Beat Notes
     _drawApproachingNotes(canvas, size, currentSongTime);
 
-    // 3. Draw Tracked Wrists (Pose Estimation feedback)
-    _drawTrackedWrists(canvas, size);
+    // 3. Draw Tracked Wrists (Pose Estimation feedback & Pre-workout hand targets)
+    _drawTrackedWrists(canvas, size, animTime);
 
     // 4. Draw Destruction & Hit Particles
     _drawHitParticles(canvas);
@@ -39,15 +42,16 @@ class RhythmPainter extends CustomPainter {
 
   /// Draws dynamic workout hit zones across the playfield (High, Mid, Low)
   void _drawHitZones(Canvas canvas, Size size, int currentSongTime) {
-    const radius = GameConstants.hitZoneRadius;
-    final pulseScale = 1.0 + 0.06 * math.sin(currentSongTime / 150.0);
+    final radius = math.min(GameConstants.hitZoneRadius, size.height * 0.085);
+    final pulseScale = 1.0 + 0.05 * math.sin(currentSongTime / 150.0);
     final pulsedRadius = radius * pulseScale;
 
-    // 1. Draw subtle ambient workout target guides (shows the 6 workout positions)
+    // 1. Draw subtle ambient workout target guides (shows the Aerobic Choreography positions)
     const workoutAnchors = [
-      GameConstants.highLeft, GameConstants.highRight,
-      GameConstants.midLeft, GameConstants.midRight,
-      GameConstants.lowLeft, GameConstants.lowRight,
+      GameConstants.overheadLeft, GameConstants.overheadRight,
+      GameConstants.wideLeft, GameConstants.wideRight,
+      GameConstants.waistLeft, GameConstants.waistRight,
+      GameConstants.highCornerLeft, GameConstants.highCornerRight,
     ];
 
     for (final anchor in workoutAnchors) {
@@ -55,10 +59,10 @@ class RhythmPainter extends CustomPainter {
       final isLeft = anchor.dx < 0.5;
       final guidePaint = Paint()
         ..color = (isLeft ? GameConstants.colorLeftLane : GameConstants.colorRightLane)
-            .withValues(alpha: 0.18)
+            .withValues(alpha: 0.16)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5;
-      canvas.drawCircle(center, radius * 0.75, guidePaint);
+      canvas.drawCircle(center, radius * 0.72, guidePaint);
     }
 
     // 2. Highlight active approaching target zones prominently
@@ -113,9 +117,10 @@ class RhythmPainter extends CustomPainter {
           ? GameConstants.colorLeftLane
           : GameConstants.colorRightLane;
 
+      final targetRadius = math.min(GameConstants.hitZoneRadius, size.height * 0.085);
       final currentRadius = note.getCurrentApproachRadius(
         currentSongTime,
-        GameConstants.hitZoneRadius,
+        targetRadius,
       );
 
       final progress = note.getProgress(currentSongTime);
@@ -148,30 +153,158 @@ class RhythmPainter extends CustomPainter {
     }
   }
 
-  /// Draws visual cursors for left & right wrists tracked by Pose Estimation
-  void _drawTrackedWrists(Canvas canvas, Size size) {
+  /// Draws visual cursors for left & right wrists tracked by Pose Estimation.
+  /// When not playing (pre-workout), renders glowing interactive target circles directly on player's hands!
+  void _drawTrackedWrists(Canvas canvas, Size size, int animTime) {
     final wristData = controller.latestWristData;
 
     final leftWristScreen = wristData.getLeftScreenOffset(size);
     final rightWristScreen = wristData.getRightScreenOffset(size);
+    final leftElbowScreen = wristData.getLeftElbowScreenOffset(size);
+    final rightElbowScreen = wristData.getRightElbowScreenOffset(size);
 
-    if (leftWristScreen != null) {
-      _drawWristCursor(
-        canvas: canvas,
-        position: leftWristScreen,
-        color: GameConstants.colorWristLeft,
-        label: 'L',
-      );
-    }
+    final isPlaying = controller.isPlaying;
 
-    if (rightWristScreen != null) {
-      _drawWristCursor(
-        canvas: canvas,
-        position: rightWristScreen,
-        color: GameConstants.colorWristRight,
-        label: 'R',
-      );
+    if (!isPlaying) {
+      // PRE-WORKOUT WARMUP: Render glowing boxing target circles directly locked on player's hands
+      if (leftWristScreen != null) {
+        if (leftElbowScreen != null) {
+          _drawForearmLine(canvas, leftElbowScreen, leftWristScreen, GameConstants.colorLeftLane);
+        }
+        _drawWarmupHandCircle(
+          canvas: canvas,
+          position: leftWristScreen,
+          color: GameConstants.colorLeftLane,
+          label: 'L',
+          animTime: animTime,
+        );
+      }
+
+      if (rightWristScreen != null) {
+        if (rightElbowScreen != null) {
+          _drawForearmLine(canvas, rightElbowScreen, rightWristScreen, GameConstants.colorRightLane);
+        }
+        _drawWarmupHandCircle(
+          canvas: canvas,
+          position: rightWristScreen,
+          color: GameConstants.colorRightLane,
+          label: 'R',
+          animTime: animTime,
+        );
+      }
+    } else {
+      // GAMEPLAY ACTIVE: Sleek, high-visibility punch reticles
+      if (leftWristScreen != null) {
+        _drawWristCursor(
+          canvas: canvas,
+          position: leftWristScreen,
+          color: GameConstants.colorWristLeft,
+          label: 'L',
+        );
+      }
+
+      if (rightWristScreen != null) {
+        _drawWristCursor(
+          canvas: canvas,
+          position: rightWristScreen,
+          color: GameConstants.colorWristRight,
+          label: 'R',
+        );
+      }
     }
+  }
+
+  /// Draws glowing target circles locked onto the player's hands before workout begins
+  void _drawWarmupHandCircle({
+    required Canvas canvas,
+    required Offset position,
+    required Color color,
+    required String label,
+    required int animTime,
+  }) {
+    final pulse = 1.0 + 0.12 * math.sin(animTime / 150.0);
+    const baseRadius = 34.0;
+    final radius = baseRadius * pulse;
+
+    // 1. Outer cyber pulsing glow
+    final glowPaint = Paint()
+      ..color = color.withValues(alpha: 0.3)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12);
+    canvas.drawCircle(position, radius * 1.25, glowPaint);
+
+    // 2. Outer segmented target ring
+    final outerRingPaint = Paint()
+      ..color = color.withValues(alpha: 0.95)
+      ..strokeWidth = 3.0
+      ..style = PaintingStyle.stroke;
+    canvas.drawCircle(position, radius, outerRingPaint);
+
+    // 3. Inner crosshair ticks
+    final tickPaint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 2.0;
+    const tickLen = 7.0;
+    canvas.drawLine(Offset(position.dx - radius - tickLen, position.dy), Offset(position.dx - radius + 3, position.dy), tickPaint);
+    canvas.drawLine(Offset(position.dx + radius - 3, position.dy), Offset(position.dx + radius + tickLen, position.dy), tickPaint);
+    canvas.drawLine(Offset(position.dx, position.dy - radius - tickLen), Offset(position.dx, position.dy - radius + 3), tickPaint);
+    canvas.drawLine(Offset(position.dx, position.dy + radius - 3), Offset(position.dx, position.dy + radius + tickLen), tickPaint);
+
+    // 4. Center glowing glove/hand badge
+    final centerPaint = Paint()
+      ..color = color.withValues(alpha: 0.3)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(position, 14.0, centerPaint);
+
+    final innerPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(position, 8.0, innerPaint);
+
+    // 5. Hand label (L / R)
+    final textSpan = TextSpan(
+      text: label,
+      style: const TextStyle(
+        color: Colors.black,
+        fontSize: 11,
+        fontWeight: FontWeight.w900,
+        fontFamily: 'monospace',
+      ),
+    );
+    final textPainter = TextPainter(
+      text: textSpan,
+      textDirection: TextDirection.ltr,
+    )..layout();
+    textPainter.paint(
+      canvas,
+      Offset(position.dx - textPainter.width / 2, position.dy - textPainter.height / 2),
+    );
+
+    // 6. Sub-label: "READY"
+    final subSpan = TextSpan(
+      text: 'READY',
+      style: TextStyle(
+        color: color,
+        fontSize: 9,
+        fontWeight: FontWeight.bold,
+        letterSpacing: 1.2,
+      ),
+    );
+    final subPainter = TextPainter(
+      text: subSpan,
+      textDirection: TextDirection.ltr,
+    )..layout();
+    subPainter.paint(
+      canvas,
+      Offset(position.dx - subPainter.width / 2, position.dy + radius + 4),
+    );
+  }
+
+  void _drawForearmLine(Canvas canvas, Offset elbow, Offset wrist, Color color) {
+    final linePaint = Paint()
+      ..color = color.withValues(alpha: 0.35)
+      ..strokeWidth = 2.0
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(elbow, wrist, linePaint);
   }
 
   /// Draws a high-visibility retro reticle on the user's wrist

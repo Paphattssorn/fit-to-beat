@@ -131,24 +131,31 @@ class _RhythmGameScreenState extends State<RhythmGameScreen>
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // LAYER 1: Fullscreen Camera Background (Front Camera)
-          CameraBackgroundLayer(
-            onCameraReady: _onCameraReady,
-          ),
+      body: ListenableBuilder(
+        listenable: _gameController,
+        builder: (context, child) {
+          _mlKitService.isMirrored = _gameController.isCameraMirrored;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              // LAYER 1: Fullscreen Camera Background (Front Camera with Mirror Toggle)
+              CameraBackgroundLayer(
+                onCameraReady: _onCameraReady,
+                isMirrored: _gameController.isCameraMirrored,
+              ),
 
-          // LAYER 2: 60 FPS CustomPaint Game Graphics & Particle Engine
-          RhythmCanvasOverlay(controller: _gameController),
+              // LAYER 2: 60 FPS CustomPaint Game Graphics & Particle Engine
+              RhythmCanvasOverlay(controller: _gameController),
 
-          // LAYER 3: Minimal-Rebuild HUD & Event Score Popups
-          HudScoreOverlay(
-            controller: _gameController,
-            isRealAiActive: _useRealAi && _isCameraReady,
-            onToggleMode: _toggleAiMode,
-          ),
-        ],
+              // LAYER 3: Minimal-Rebuild HUD & Event Score Popups
+              HudScoreOverlay(
+                controller: _gameController,
+                isRealAiActive: _useRealAi && _isCameraReady,
+                onToggleMode: _toggleAiMode,
+              ),
+            ],
+          );
+        },
       ),
     );
   }

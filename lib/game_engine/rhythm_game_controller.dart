@@ -52,6 +52,14 @@ class RhythmGameController extends ChangeNotifier {
   List<BeatNote> get activeNotes => List.unmodifiable(_activeNotes);
   List<HitParticle> get particles => List.unmodifiable(_particles);
   PoseWristData get latestWristData => _latestWristData;
+  bool get isCameraMirrored => _isCameraMirrored;
+
+  bool _isCameraMirrored = true;
+
+  void toggleCameraMirror() {
+    _isCameraMirrored = !_isCameraMirrored;
+    notifyListeners();
+  }
 
   PoseDetectorService poseService;
 
@@ -236,38 +244,135 @@ class RhythmGameController extends ChangeNotifier {
 
 
 
-  /// Generate rhythmic beat sequence with dynamic workout zones across the screen
+  /// Generate rhythmic beat sequence with dynamic aerobic workout poses
   void _generateMockSongChart() {
     _activeNotes.clear();
-    int startMs = 1200;
-    const intervalMs = 1600;
+    int currentTimeMs = 1400;
+    int noteIdCounter = 0;
 
-    // Varied workout pattern across High, Mid, and Low targets
-    final List<Map<String, dynamic>> pattern = [
-      {'lane': NoteLane.left, 'target': GameConstants.midLeft},
-      {'lane': NoteLane.right, 'target': GameConstants.midRight},
-      {'lane': NoteLane.left, 'target': GameConstants.highLeft},
-      {'lane': NoteLane.right, 'target': GameConstants.highRight},
-      {'lane': NoteLane.left, 'target': GameConstants.lowLeft},
-      {'lane': NoteLane.right, 'target': GameConstants.lowRight},
-      {'lane': NoteLane.right, 'target': GameConstants.highRight},
-      {'lane': NoteLane.left, 'target': GameConstants.midLeft},
-      {'lane': NoteLane.right, 'target': GameConstants.midRight},
-      {'lane': NoteLane.left, 'target': GameConstants.lowLeft},
+    // Choreography blocks:
+    // 'double_overhead': both hands reach up (2 circles close together on top)
+    // 'wide_arms': both hands spread wide (2 circles at shoulder width)
+    // 'waist_left': left hand touches waist
+    // 'waist_right': right hand touches waist
+    // 'high_left': left hand reaches high corner
+    // 'high_right': right hand reaches high corner
+    final List<String> choreographyRoutine = [
+      'high_left',
+      'high_right',
+      'double_overhead',
+      'wide_arms',
+      'waist_left',
+      'waist_right',
+      'double_overhead',
+      'wide_arms',
+      'high_left',
+      'waist_left',
+      'high_right',
+      'waist_right',
+      'double_overhead',
+      'wide_arms',
+      'waist_left',
+      'waist_right',
+      'double_overhead',
+      'wide_arms',
     ];
 
-    for (int i = 0; i < 40; i++) {
-      final step = pattern[i % pattern.length];
-      final targetTime = startMs + (i * intervalMs);
+    // Repeat routine for full workout session
+    for (int loop = 0; loop < 4; loop++) {
+      for (final step in choreographyRoutine) {
+        switch (step) {
+          case 'double_overhead':
+            // 2 notes simultaneously: both hands reach up high
+            _activeNotes.add(
+              BeatNote(
+                id: 'note_${noteIdCounter++}',
+                lane: NoteLane.left,
+                targetTimestampMs: currentTimeMs,
+                normalizedTarget: GameConstants.overheadLeft,
+              ),
+            );
+            _activeNotes.add(
+              BeatNote(
+                id: 'note_${noteIdCounter++}',
+                lane: NoteLane.right,
+                targetTimestampMs: currentTimeMs,
+                normalizedTarget: GameConstants.overheadRight,
+              ),
+            );
+            currentTimeMs += 1800;
+            break;
 
-      _activeNotes.add(
-        BeatNote(
-          id: 'note_$i',
-          lane: step['lane'] as NoteLane,
-          targetTimestampMs: targetTime,
-          normalizedTarget: step['target'] as Offset,
-        ),
-      );
+          case 'wide_arms':
+            // 2 notes simultaneously: both hands spread wide
+            _activeNotes.add(
+              BeatNote(
+                id: 'note_${noteIdCounter++}',
+                lane: NoteLane.left,
+                targetTimestampMs: currentTimeMs,
+                normalizedTarget: GameConstants.wideLeft,
+              ),
+            );
+            _activeNotes.add(
+              BeatNote(
+                id: 'note_${noteIdCounter++}',
+                lane: NoteLane.right,
+                targetTimestampMs: currentTimeMs,
+                normalizedTarget: GameConstants.wideRight,
+              ),
+            );
+            currentTimeMs += 1800;
+            break;
+
+          case 'waist_left':
+            _activeNotes.add(
+              BeatNote(
+                id: 'note_${noteIdCounter++}',
+                lane: NoteLane.left,
+                targetTimestampMs: currentTimeMs,
+                normalizedTarget: GameConstants.waistLeft,
+              ),
+            );
+            currentTimeMs += 1500;
+            break;
+
+          case 'waist_right':
+            _activeNotes.add(
+              BeatNote(
+                id: 'note_${noteIdCounter++}',
+                lane: NoteLane.right,
+                targetTimestampMs: currentTimeMs,
+                normalizedTarget: GameConstants.waistRight,
+              ),
+            );
+            currentTimeMs += 1500;
+            break;
+
+          case 'high_left':
+            _activeNotes.add(
+              BeatNote(
+                id: 'note_${noteIdCounter++}',
+                lane: NoteLane.left,
+                targetTimestampMs: currentTimeMs,
+                normalizedTarget: GameConstants.highCornerLeft,
+              ),
+            );
+            currentTimeMs += 1500;
+            break;
+
+          case 'high_right':
+            _activeNotes.add(
+              BeatNote(
+                id: 'note_${noteIdCounter++}',
+                lane: NoteLane.right,
+                targetTimestampMs: currentTimeMs,
+                normalizedTarget: GameConstants.highCornerRight,
+              ),
+            );
+            currentTimeMs += 1500;
+            break;
+        }
+      }
     }
   }
 

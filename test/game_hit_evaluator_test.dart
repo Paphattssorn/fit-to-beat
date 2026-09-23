@@ -53,11 +53,11 @@ void main() {
         timestampMs: targetTimeMs,
       );
 
-      // Timing difference = 200ms (> perfectWindowMs 140ms, <= goodWindowMs 280ms)
+      // Timing difference = 260ms (> perfectWindowMs 220ms, <= goodWindowMs 380ms)
       final result = GameHitEvaluator.evaluateHit(
         note: note,
         wristData: wristData,
-        songTimeMs: targetTimeMs + 200,
+        songTimeMs: targetTimeMs + 260,
         screenSize: screenSize,
         currentCombo: 2,
       );

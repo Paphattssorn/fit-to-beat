@@ -21,6 +21,27 @@ class MlKitPoseDetectorService implements PoseDetectorService {
   bool _isProcessing = false;
   bool _isStreaming = false;
   int _lastInferenceTimeMs = 0;
+  bool isMirrored = true;
+
+  // Exponential Moving Average (EMA) smoothing & persistence state
+  Offset? _smoothedLeftWrist;
+  Offset? _smoothedRightWrist;
+  Offset? _smoothedLeftElbow;
+  Offset? _smoothedRightElbow;
+  double _smoothedLeftConfidence = 0.0;
+  double _smoothedRightConfidence = 0.0;
+  int _lastDetectionMs = 0;
+
+  static const double _smoothingAlpha = 0.65; // High responsiveness without jitter
+
+  Offset? _smoothOffset(Offset? current, Offset? target, double alpha) {
+    if (target == null) return current;
+    if (current == null) return target;
+    return Offset(
+      current.dx + (target.dx - current.dx) * alpha,
+      current.dy + (target.dy - current.dy) * alpha,
+    );
+  }
 
   PoseWristData _latestWristData = PoseWristData.empty;
 
@@ -126,55 +147,75 @@ class MlKitPoseDetectorService implements PoseDetectorService {
             ? cameraImage.width.toDouble()
             : cameraImage.height.toDouble();
 
-        final bool isFrontCamera =
-            description.lensDirection == CameraLensDirection.front;
+        final bool shouldMirror = isMirrored;
 
-        // Extract normalized coordinates with front camera horizontal mirroring
-        Offset? leftOffset;
+        // 1. Extract raw normalized coordinates
+        Offset? rawLeft;
         if (leftWrist != null) {
           final normX = (leftWrist.x / frameWidth).clamp(0.0, 1.0);
           final normY = (leftWrist.y / frameHeight).clamp(0.0, 1.0);
-          leftOffset = Offset(isFrontCamera ? (1.0 - normX) : normX, normY);
+          rawLeft = Offset(shouldMirror ? (1.0 - normX) : normX, normY);
         }
 
-        Offset? rightOffset;
+        Offset? rawRight;
         if (rightWrist != null) {
           final normX = (rightWrist.x / frameWidth).clamp(0.0, 1.0);
           final normY = (rightWrist.y / frameHeight).clamp(0.0, 1.0);
-          rightOffset = Offset(isFrontCamera ? (1.0 - normX) : normX, normY);
+          rawRight = Offset(shouldMirror ? (1.0 - normX) : normX, normY);
         }
 
-        Offset? leftElbowOffset;
+        Offset? rawLeftElbow;
         if (leftElbow != null) {
           final normX = (leftElbow.x / frameWidth).clamp(0.0, 1.0);
           final normY = (leftElbow.y / frameHeight).clamp(0.0, 1.0);
-          leftElbowOffset = Offset(isFrontCamera ? (1.0 - normX) : normX, normY);
+          rawLeftElbow = Offset(shouldMirror ? (1.0 - normX) : normX, normY);
         }
 
-        Offset? rightElbowOffset;
+        Offset? rawRightElbow;
         if (rightElbow != null) {
           final normX = (rightElbow.x / frameWidth).clamp(0.0, 1.0);
           final normY = (rightElbow.y / frameHeight).clamp(0.0, 1.0);
-          rightElbowOffset = Offset(isFrontCamera ? (1.0 - normX) : normX, normY);
+          rawRightElbow = Offset(shouldMirror ? (1.0 - normX) : normX, normY);
         }
 
+        // 2. Apply Exponential Moving Average (EMA) Smoothing
+        _smoothedLeftWrist = _smoothOffset(_smoothedLeftWrist, rawLeft, _smoothingAlpha);
+        _smoothedRightWrist = _smoothOffset(_smoothedRightWrist, rawRight, _smoothingAlpha);
+        _smoothedLeftElbow = _smoothOffset(_smoothedLeftElbow, rawLeftElbow, _smoothingAlpha);
+        _smoothedRightElbow = _smoothOffset(_smoothedRightElbow, rawRightElbow, _smoothingAlpha);
+
+        _smoothedLeftConfidence = leftWrist?.likelihood ?? 0.0;
+        _smoothedRightConfidence = rightWrist?.likelihood ?? 0.0;
+        _lastDetectionMs = now;
+
         _latestWristData = PoseWristData(
-          leftWrist: leftOffset,
-          rightWrist: rightOffset,
-          leftElbow: leftElbowOffset,
-          rightElbow: rightElbowOffset,
-          leftConfidence: leftWrist?.likelihood ?? 0.0,
-          rightConfidence: rightWrist?.likelihood ?? 0.0,
-          timestampMs: DateTime.now().millisecondsSinceEpoch,
+          leftWrist: _smoothedLeftWrist,
+          rightWrist: _smoothedRightWrist,
+          leftElbow: _smoothedLeftElbow,
+          rightElbow: _smoothedRightElbow,
+          leftConfidence: _smoothedLeftConfidence,
+          rightConfidence: _smoothedRightConfidence,
+          timestampMs: now,
         );
 
         _streamController.add(_latestWristData);
       } else {
-        // No body pose detected in this frame
+        // Frame persistence: if frame is dropped momentarily, maintain smoothed position with decay
+        final elapsed = now - _lastDetectionMs;
+        if (elapsed < 300) {
+          _smoothedLeftConfidence *= 0.8;
+          _smoothedRightConfidence *= 0.8;
+        } else {
+          _smoothedLeftConfidence = 0.0;
+          _smoothedRightConfidence = 0.0;
+        }
+
         _latestWristData = _latestWristData.copyWith(
-          leftConfidence: 0.0,
-          rightConfidence: 0.0,
-          timestampMs: DateTime.now().millisecondsSinceEpoch,
+          leftWrist: _smoothedLeftConfidence > 0.15 ? _smoothedLeftWrist : null,
+          rightWrist: _smoothedRightConfidence > 0.15 ? _smoothedRightWrist : null,
+          leftConfidence: _smoothedLeftConfidence,
+          rightConfidence: _smoothedRightConfidence,
+          timestampMs: now,
         );
         _streamController.add(_latestWristData);
       }

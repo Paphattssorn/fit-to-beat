@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -13,11 +14,13 @@ import 'package:flutter/material.dart';
 class CameraBackgroundLayer extends StatefulWidget {
   final ValueChanged<CameraController?>? onCameraInitialized;
   final void Function(CameraController controller, CameraDescription cameraDescription)? onCameraReady;
+  final bool isMirrored;
 
   const CameraBackgroundLayer({
     super.key,
     this.onCameraInitialized,
     this.onCameraReady,
+    this.isMirrored = true,
   });
 
   @override
@@ -116,14 +119,24 @@ class _CameraBackgroundLayerState extends State<CameraBackgroundLayer>
           final camera = _cameraController!;
           if (!camera.value.isInitialized) return _buildSimulatorFallback();
 
+          Widget preview = SizedBox(
+            width: 100,
+            child: CameraPreview(camera),
+          );
+
+          if (widget.isMirrored) {
+            preview = Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.rotationY(math.pi),
+              child: preview,
+            );
+          }
+
           return SizedBox.expand(
             child: FittedBox(
               fit: BoxFit.cover,
               clipBehavior: Clip.hardEdge,
-              child: SizedBox(
-                width: 100,
-                child: CameraPreview(camera),
-              ),
+              child: preview,
             ),
           );
         },
