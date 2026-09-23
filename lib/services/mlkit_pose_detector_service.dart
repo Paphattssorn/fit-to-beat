@@ -20,6 +20,7 @@ class MlKitPoseDetectorService implements PoseDetectorService {
 
   bool _isProcessing = false;
   bool _isStreaming = false;
+  int _lastInferenceTimeMs = 0;
 
   PoseWristData _latestWristData = PoseWristData.empty;
 
@@ -84,14 +85,17 @@ class MlKitPoseDetectorService implements PoseDetectorService {
     }
   }
 
-  /// Frame processing with Frame Dropping to maintain 60 FPS UI performance
+  /// Frame processing with Frame Dropping and Throttling to maintain 60 FPS UI performance
   Future<void> _processCameraFrame(
     CameraImage cameraImage,
     CameraDescription description,
   ) async {
-    // Drop frame if AI is still processing previous frame to prevent queue lag
+    final now = DateTime.now().millisecondsSinceEpoch;
+    // Throttle ML Kit to ~15 FPS (every 66ms) to keep 60 FPS game UI buttery smooth
+    if (now - _lastInferenceTimeMs < 66) return;
     if (_isProcessing || !_isStreaming || _poseDetector == null) return;
     _isProcessing = true;
+    _lastInferenceTimeMs = now;
 
     try {
       final inputImage = CameraImageConverter.toInputImage(

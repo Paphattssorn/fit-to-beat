@@ -53,7 +53,7 @@ class _CameraBackgroundLayerState extends State<CameraBackgroundLayer>
 
       final controller = CameraController(
         frontCamera,
-        ResolutionPreset.high,
+        ResolutionPreset.medium,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.yuv420,
       );
